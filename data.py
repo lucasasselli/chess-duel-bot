@@ -1,8 +1,8 @@
-from shared import bot, app
+from shared import bot
 
 import io
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import IntEnum
 from google.cloud import ndb
 import telegram
@@ -44,7 +44,6 @@ class User(ndb.Model):
     adversary_id = ndb.IntegerProperty()
     match_id = ndb.IntegerProperty()
     silence = ndb.BooleanProperty(default=False)
-    expired = ndb.ComputedProperty(lambda self: (datetime.now() - self.last_activity_date) > timedelta(days=app.config['USER_TIMEOUT']))
 
     # Properties
     admin = ndb.BooleanProperty(default=False)
@@ -174,9 +173,8 @@ class Match(ndb.Model):
     black_id = ndb.IntegerProperty()
 
     last_move_code = ndb.StringProperty()
-    last_move_date = ndb.DateTimeProperty(default=datetime.now())
+    last_move_date = ndb.DateTimeProperty(default=None)
     timeout = ndb.IntegerProperty(default=3600)
-    expired = ndb.ComputedProperty(lambda self: (datetime.now() - self.last_move_date) > timedelta(seconds=self.timeout))
 
     def get_board(self):
 

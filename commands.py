@@ -151,8 +151,8 @@ class New2(Command):
                 # TODO: Print error
                 return
 
-            match = Match(white_id=user.key.id(),
-                          black_id=adversary.key.id(),
+            match = Match(white_id=adversary.key.id(),
+                          black_id=user.key.id(),
                           timeout=timeout)
             match.put()
 
@@ -188,6 +188,10 @@ class AcceptRequest(Command):
 
         # Remove inline button
         bot.deleteMessage(user.chat_id, self.message_id)
+
+        # Update last move
+        match.last_move_date = datetime.now()
+        match.put()
 
         user.start_match()
         user.send_message("Request accepted!")
