@@ -1,0 +1,7 @@
+cron:
+- description: "User maintainance"
+  url: /tasks/maintain_users
+  schedule: every 24 hours
+- description: "Match maintainance"
+  url: /tasks/maintain_matches
+  schedule: every 1 minutes

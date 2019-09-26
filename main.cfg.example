@@ -1,0 +1,10 @@
+# Bot config
+BOT_TOKEN = ""
+BOT_HOOK = ""
+BOT_HOST = ""
+
+# Game config
+USER_TIMEOUT = 365
+
+# Admin
+ADMIN_PASS = ""
