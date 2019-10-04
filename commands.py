@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 import telegram
 import constants
-from data import UserStatus, User, Match
+from data import UserStatus, User, Match, MoveResult
 import humanfriendly
 import game
 from game import GameResult
@@ -135,12 +135,12 @@ class New2(Command):
         query_list = list(query.fetch())
 
         if len(query_list) != 1:
-
             # Adversary not found
             invite_button = [[telegram.InlineKeyboardButton("Invite a friend", switch_inline_query=constants.STRING_SHARED)]]
             reply_markup = telegram.InlineKeyboardMarkup(invite_button)
             user.send_message(adversary_username + " is not a Chess Duel Bot user.", reply_markup=telegram.ReplyKeyboardRemove(True))
             user.send_message(constants.STRING_INVITE, reply_markup=reply_markup)
+            return
 
         adversary = query_list[0]
         if adversary.status == UserStatus.IDLE:
@@ -195,13 +195,13 @@ class AcceptRequest(Command):
 
         user.start_match()
         user.send_message("Request accepted!")
-        bot.send_photo(user.chat_id, photo=match.get_board_img(user))
+        user.send_photo(photo=match.get_board_img(user))
         user.send_message("It's your turn!")
 
         adversary.start_match()
         adversary.send_message(user.username + " has accepted your request.")
-        bot.send_photo(adversary.chat_id, photo=match.get_board_img(adversary))
-        user.send_message("It's " + user.username + " turn...")
+        adversary.send_photo(photo=match.get_board_img(adversary))
+        adversary.send_message("It's " + user.username + " turn...")
 
 
 class RefuseRequest(Command):
@@ -327,15 +327,19 @@ class Move2(Command):
             user.send_message(constants.ERROR_TURN)
             return False
 
-        result = game.check_move(board, user.pending_arg)
-        if int(result) >= 0:
+        move_result = game.check_move(board, user.pending_arg)
+        if int(move_result) >= 0:
             accept_button = [[telegram.InlineKeyboardButton("Accept", callback_data='/accept'),
                               telegram.InlineKeyboardButton("Cancel", callback_data='/cancel')]]
             reply_markup = telegram.InlineKeyboardMarkup(accept_button)
             user.send_photo(photo=match.get_board_img(user, user.pending_arg), caption="Do you want to confirm this move?", reply_markup=reply_markup)
             return True
         else:
-            user.send_message(constants.ERROR_MOVE_BAD)
+            # Error
+            if move_result == MoveResult.BAD:
+                user.send_message(constants.ERROR_MOVE_BAD)
+            elif move_result == MoveResult.UNKNOWN:
+                user.send_message(constants.ERROR_MOVE_UNKNOWN)
             return False
 
     def arg_body(self):
@@ -592,6 +596,7 @@ def handle_input(user, text, message_id):
         # If the user is playing, assume this as a move command
         match = user.get_match()
         if match:
-            game.move(user, text)
+            command_handler = Move1(user, '/move1', message_id)
+            command_handler.cmd_run(True)
     else:
         user.send_message(constants.ERROR_BAD_INPUT_GENERAL)
