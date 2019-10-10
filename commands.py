@@ -4,10 +4,10 @@ import logging
 from datetime import datetime
 import telegram
 import constants
-from data import UserStatus, User, Match, MoveResult
+from data import UserStatus, User, Match
 import humanfriendly
 import game
-from game import GameResult
+from game import GameResult, MoveResult
 
 
 class Command(object):
@@ -80,7 +80,7 @@ class New1(Command):
                 custom_keyboard.append([timeout])
             reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard, resize_keyboard=True)
 
-        user.send_message("Please enter the move timeout for the match.", reply_markup=reply_markup)
+        user.send_message("Please enter the move timeout for the match, or /cancel.", reply_markup=reply_markup)
 
         return True
 
@@ -88,15 +88,21 @@ class New1(Command):
 
         user = self.user
 
-        timeout = constants.MATCH_TIMEOUTS[self.text]
-        if timeout:
-            user.send_message("Timeout selected!", reply_markup=telegram.ReplyKeyboardRemove(True))
-            user.pending_arg = str(timeout)
-            user.put()
-            command_handler = New2(user, '/new2', self.message_id)
-            command_handler.cmd_run(True)
+        if self.text == "/cancel":
+            user.send_message("Game cancelled!", reply_markup=telegram.ReplyKeyboardRemove(True))
+        elif self.text in constants.MATCH_TIMEOUTS:
+            timeout = constants.MATCH_TIMEOUTS[self.text]
+            if timeout:
+                user.send_message("Timeout selected!", reply_markup=telegram.ReplyKeyboardRemove(True))
+                user.pending_arg = str(timeout)
+                user.put()
+                command_handler = New2(user, '/new2', self.message_id)
+                command_handler.cmd_run(True)
+            else:
+                user.send_message(constants.ERROR_BAD_TIMEOUT, reply_markup=telegram.ReplyKeyboardRemove(True))
         else:
-            user.send_message(constants.ERROR_BAD_TIMEOUT, reply_markup=telegram.ReplyKeyboardRemove(True))
+            user.send_message("Unknown timeout!", reply_markup=telegram.ReplyKeyboardRemove(True))
+
 
 
 class New2(Command):
@@ -118,7 +124,7 @@ class New2(Command):
                     custom_keyboard.append([username])
                 reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard, resize_keyboard=True)
 
-        user.send_message("Please enter the username of your adversary.", reply_markup=reply_markup)
+        user.send_message("Please enter the username of your adversary, or /cancel to cancel.", reply_markup=reply_markup)
 
         return True
 
@@ -127,52 +133,55 @@ class New2(Command):
         user = self.user
         adversary_username = self.text
 
-        if adversary_username == user.username and not user.admin:
-            user.send_message(constants.ERROR_SAME_USER, reply_markup=telegram.ReplyKeyboardRemove(True))
-            return
-
-        query = User.query(User.username == adversary_username)
-        query_list = list(query.fetch())
-
-        if len(query_list) != 1:
-            # Adversary not found
-            invite_button = [[telegram.InlineKeyboardButton("Invite a friend", switch_inline_query=constants.STRING_SHARED)]]
-            reply_markup = telegram.InlineKeyboardMarkup(invite_button)
-            user.send_message(adversary_username + " is not a Chess Duel Bot user.", reply_markup=telegram.ReplyKeyboardRemove(True))
-            user.send_message(constants.STRING_INVITE, reply_markup=reply_markup)
-            return
-
-        adversary = query_list[0]
-        if adversary.status == UserStatus.IDLE:
-
-            try:
-                timeout = int(user.pending_arg)
-            except ValueError:
-                # TODO: Print error
+        if self.text == "/cancel":
+            user.send_message("Game cancelled!", reply_markup=telegram.ReplyKeyboardRemove(True))
+        else:
+            if adversary_username == user.username and not user.admin:
+                user.send_message(constants.ERROR_SAME_USER, reply_markup=telegram.ReplyKeyboardRemove(True))
                 return
 
-            match = Match(white_id=adversary.key.id(),
-                          black_id=user.key.id(),
-                          timeout=timeout)
-            match.put()
+            query = User.query(User.username == adversary_username)
+            query_list = list(query.fetch())
 
-            # Adversary found
-            user.setup_match(match, adversary, False)
-            user.send_message(constants.STRING_REQUEST_SENT, reply_markup=telegram.ReplyKeyboardRemove(True))
+            if len(query_list) != 1:
+                # Adversary not found
+                invite_button = [[telegram.InlineKeyboardButton("Invite a friend", switch_inline_query=constants.STRING_SHARED)]]
+                reply_markup = telegram.InlineKeyboardMarkup(invite_button)
+                user.send_message(adversary_username + " is not a Chess Duel Bot user.", reply_markup=telegram.ReplyKeyboardRemove(True))
+                user.send_message(constants.STRING_INVITE, reply_markup=reply_markup)
+                return
 
-            adversary.setup_match(match, user, True)
-            accept_button = [[telegram.InlineKeyboardButton("Accept", callback_data='/accept'),
-                              telegram.InlineKeyboardButton("Refuse", callback_data='/refuse')]]
-            reply_markup = telegram.InlineKeyboardMarkup(accept_button)
-            adversary.send_message(
-                constants.STRING_REQUEST_RECEIVED.format(
-                    user.username,
-                    humanfriendly.format_timespan(match.timeout)),
-                reply_markup=reply_markup)
-        else:
+            adversary = query_list[0]
+            if adversary.status == UserStatus.IDLE:
 
-            # Adversary busy
-            user.send_message("Adversary is busy", reply_markup=telegram.ReplyKeyboardRemove(True))
+                try:
+                    timeout = int(user.pending_arg)
+                except ValueError:
+                    # TODO: Print error
+                    return
+
+                match = Match(white_id=adversary.key.id(),
+                            black_id=user.key.id(),
+                            timeout=timeout)
+                match.put()
+
+                # Adversary found
+                user.setup_match(match, adversary, False)
+                user.send_message(constants.STRING_REQUEST_SENT, reply_markup=telegram.ReplyKeyboardRemove(True))
+
+                adversary.setup_match(match, user, True)
+                accept_button = [[telegram.InlineKeyboardButton("Accept", callback_data='/accept'),
+                                telegram.InlineKeyboardButton("Refuse", callback_data='/refuse')]]
+                reply_markup = telegram.InlineKeyboardMarkup(accept_button)
+                adversary.send_message(
+                    constants.STRING_REQUEST_RECEIVED.format(
+                        user.username,
+                        humanfriendly.format_timespan(match.timeout)),
+                    reply_markup=reply_markup)
+            else:
+
+                # Adversary busy
+                user.send_message("Adversary is busy", reply_markup=telegram.ReplyKeyboardRemove(True))
 
 
 class AcceptRequest(Command):
@@ -302,12 +311,19 @@ class Move1(Command):
             user.send_message("Move cancelled.")
             return
 
-        result = game.check_move(board, self.text)
-        if int(result) >= 0:
+        move_result = game.check_move(board, self.text)
+        if int(move_result) >= 0:
             user.pending_arg = self.text
             user.put()
             command_handler = Move2(user, '/move2', self.message_id)
             command_handler.cmd_run(True)
+        else:
+            # Error
+            if move_result == MoveResult.BAD:
+                user.send_message(constants.ERROR_MOVE_BAD)
+            elif move_result == MoveResult.UNKNOWN:
+                user.send_message(constants.ERROR_MOVE_UNKNOWN)
+            return False
 
 
 class Move2(Command):
@@ -333,14 +349,8 @@ class Move2(Command):
                               telegram.InlineKeyboardButton("Cancel", callback_data='/cancel')]]
             reply_markup = telegram.InlineKeyboardMarkup(accept_button)
             user.send_photo(photo=match.get_board_img(user, user.pending_arg), caption="Do you want to confirm this move?", reply_markup=reply_markup)
-            return True
-        else:
-            # Error
-            if move_result == MoveResult.BAD:
-                user.send_message(constants.ERROR_MOVE_BAD)
-            elif move_result == MoveResult.UNKNOWN:
-                user.send_message(constants.ERROR_MOVE_UNKNOWN)
-            return False
+
+        return True
 
     def arg_body(self):
 
@@ -596,7 +606,7 @@ def handle_input(user, text, message_id):
         # If the user is playing, assume this as a move command
         match = user.get_match()
         if match:
-            command_handler = Move1(user, '/move1', message_id)
-            command_handler.cmd_run(True)
+            command_handler = Move1(user, text, message_id)
+            command_handler.arg_run()
     else:
         user.send_message(constants.ERROR_BAD_INPUT_GENERAL)

@@ -145,7 +145,7 @@ class User(ndb.Model):
                          timeout=timeout,
                          **kwargs)
 
-    def send_photo(self, photo, caption=None, disable_notification=True, reply_to_message_id=None, reply_markup=None, timeout=20, **kwargs):
+    def send_photo(self, photo, caption=None, disable_notification=False, reply_to_message_id=None, reply_markup=None, timeout=20, **kwargs):
 
         if caption:
             emoji_text = emoji.emojize(caption, use_aliases=True)
