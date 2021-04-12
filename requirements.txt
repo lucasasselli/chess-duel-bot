@@ -3,6 +3,6 @@ python-telegram-bot==12.1.0
 python-chess==0.28.3
 google-cloud-ndb==0.1.0
 google-cloud-logging==1.8.0
-CairoSVG==2.4.2
+CairoSVG==2.5.1
 emoji==0.5.4
 humanfriendly==4.18
