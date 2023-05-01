@@ -1,4 +1,4 @@
-Flask==1.1.1
+Flask==2.3.2
 python-telegram-bot==12.1.0
 python-chess==0.28.3
 google-cloud-ndb==0.1.0
